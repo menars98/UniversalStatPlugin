@@ -484,10 +484,14 @@ Right-click in Content Browser → Miscellaneous → Data Asset:
 - `UUniversalStatClampPreset` — set HP clamp (min 0, max = `Stat.Health.Max`)
 - `UUniversalStatTriggerPreset` — fire `Event.Character.Dead` when Health ≤ 0
 
+### 5. Create Blueprint
+
+Right-click in Content Browser → Blueprint Class →  `UniversalStatsComponent`:
+
 ### 4. Add Components
 
 On your Character Blueprint:
-- Add `UniversalStatsComponent` → assign your data assets in Details
+- Add `UniversalStatsComponent` → assign your data assets in Details (CRITICAL NOTE: I highly recommend creating a Blueprint Child of this component first, and adding that child to your character. This allows you to override powerful functions like PreStatChange directly in Blueprint!)
 - Add `UniversalCueComponent` → assign your `CuePreset`
 
 ### 5. Create an Effect
