@@ -6,28 +6,77 @@ A lightweight, GAS-free stats & effects system for Unreal Engine. Tag-driven, Bl
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Core Components](#core-components)
+1. [Installation](#installation)
+2. [Demo Map](#demo-map)
+3. [Architecture Overview](#architecture-overview)
+4. [Core Components](#core-components)
    - [UniversalStatsComponent](#universalstatscomponent)
    - [UniversalCueComponent](#universalcuecomponent)
-3. [Data Assets](#data-assets)
+5. [Data Assets](#data-assets)
    - [UniversalStatPreset](#universalstatpreset)
    - [UniversalStatClampPreset](#universalstatclamppreset)
    - [UniversalStatTriggerPreset](#universalstattriggerpreset)
    - [UniversalCuePreset](#universalcuepreset)
-4. [Effects System](#effects-system)
+6. [Effects System](#effects-system)
    - [UUniversalStatEffect](#uuniversalstateffect)
    - [Effect Duration Types](#effect-duration-types)
    - [Effect Stacking](#effect-stacking)
    - [Applying & Removing Effects](#applying--removing-effects)
-5. [Visual / Audio Cue System](#visual--audio-cue-system)
+7. [Visual / Audio Cue System](#visual--audio-cue-system)
    - [AUniversalGameplayCue](#auniversalgameplaycue)
    - [Cue Types](#cue-types)
-6. [Delegates & Events](#delegates--events)
-7. [UI Listener](#ui-listener)
-8. [Replication](#replication)
-9. [Quick Start Guide](#quick-start-guide)
-10. [Known Limitations & TODOs](#known-limitations--todos)
+8. [Delegates & Events](#delegates--events)
+9. [UI Listener](#ui-listener)
+10. [Replication](#replication)
+11. [Quick Start Guide](#quick-start-guide)
+12. [Design Notes & Known Limitations](#design-notes--known-limitations)
+
+---
+
+## Installation
+
+1. **Download** this repository as a `.zip` (click **Code → Download ZIP** on GitHub).
+2. **Create a `Plugins` folder** in the root of your Unreal Engine project directory (next to your `.uproject` file) if one doesn't already exist.
+3. **Extract** the downloaded folder into `YourProject/Plugins/` so the structure looks like:
+   ```
+   YourProject/
+   ├── Content/
+   ├── Source/
+   ├── Plugins/
+   │   └── RumbleCore/
+   │       ├── RumbleCore.uplugin
+   │       ├── Source/
+   │       └── Content/
+   └── YourProject.uproject
+   ```
+4. **Right-click** your `.uproject` file and select **Generate Visual Studio project files**.
+5. **Open the solution** in Visual Studio (or Rider) and **compile** the project. Unreal will detect and build the plugin automatically.
+6. After launching the editor, go to **Edit → Plugins**, search for **RumbleCore**, and confirm it is enabled.
+
+> **Unreal Engine version:** This plugin targets UE5. UE4 is not supported.
+
+---
+
+## Demo Map
+
+**A showcase map is included in the plugin content — no setup required to try the system.**
+
+Open it from the Content Browser at:
+```
+Plugins → RumbleCore Content → UniversalStatContents → Map → RC_ShowcaseMap
+```
+
+The map features several pre-built scenarios so you can experience all major systems before writing a single line of code:
+
+| Scenario | What it demonstrates |
+|---|---|
+| **Dash Mechanic** | Stamina drain on input, cooldown recovery, clamp rules in action |
+| **Poison Swamp** | `HasDuration` effect with periodic damage, `State.Poisoned` tag, looping Cue actor with VFX fade-out |
+| **Spike Trap** | Instant effect, `Event.Character.Dead` trigger, camera shake via `OnCueExecuted` |
+| **Armor & Poison Resistance Shrine** | Stacking buff (`AddStack`), `OnCueUpdated` driving material intensity, max stack cap |
+| **Lethal Laser** (Immortality) | PreStatChange override in Action! Prevents lethal damage from dropping health below 1 when the State.Immortal tag is active.
+
+> If you don't see the plugin content in the browser, enable **Show Plugin Content** in the Content Browser filter dropdown.
 
 ---
 
@@ -484,15 +533,13 @@ Right-click in Content Browser → Miscellaneous → Data Asset:
 - `UUniversalStatClampPreset` — set HP clamp (min 0, max = `Stat.Health.Max`)
 - `UUniversalStatTriggerPreset` — fire `Event.Character.Dead` when Health ≤ 0
 
-### 5. Create Blueprint
-
-Right-click in Content Browser → Blueprint Class →  `UniversalStatsComponent`:
-
 ### 4. Add Components
 
 On your Character Blueprint:
-- Add `UniversalStatsComponent` → assign your data assets in Details (CRITICAL NOTE: I highly recommend creating a Blueprint Child of this component first, and adding that child to your character. This allows you to override powerful functions like PreStatChange directly in Blueprint!)
+- Add `UniversalStatsComponent` → assign your data assets in Details
 - Add `UniversalCueComponent` → assign your `CuePreset`
+
+> **Recommended:** Instead of adding `UniversalStatsComponent` directly, create a **Blueprint child class** of it first (`BP_HeroStatsComponent`, for example), then add that child to your character. This lets you override `PreStatChange` and other `BlueprintNativeEvent` functions directly in Blueprint — without touching C++. If you add the base class directly, those override points are still available but require a C++ subclass to use.
 
 ### 5. Create an Effect
 
@@ -523,10 +570,36 @@ In Blueprint, bind `OnGameplayEvent` on the stats component. Check `EventTag == 
 
 ---
 
-## Known Limitations & TODOs
+## Design Notes & Known Limitations
 
-- **No effect roll-back on expiry.** When a `HasDuration` or `Infinite` effect ends (or is removed), flat stat modifiers are **not** automatically reverted. Only `RemoveEffectsByClass` / `RemoveEffectsWithTag` perform reversion for non-periodic effects. This is acknowledged in the source (`@TODO`). Workaround: use periodic effects for damage/drain, or track buff values manually in `PreStatChange`.
-- **`ActiveEffects` is not replicated.** Effect state only lives on the server. Clients reconstruct the visual state from tag and stat delegates.
-- **`EqualTo` trigger condition** uses `FMath::IsNearlyEqual` (float epsilon). It may not fire reliably if the value is set from replication rather than directly.
-- **`OnCueRemoved` does not auto-destroy the cue actor.** Call `Destroy()` yourself in the Blueprint implementation of `OnCueRemoved`.
-- **`#include "UniversalStatClampPreset.cpp"`** and **`#include "UniversalStatTriggerPreset.cpp"`** in the headers are non-standard. These should be moved to the corresponding `.cpp` files to avoid potential link issues in larger projects.
+### Cue Actor Lifetime — Full VFX Control by Design
+
+`OnCueRemoved` does **not** automatically call `Destroy()` on the cue actor. This is an **intentional design decision**, not a limitation.
+
+If the engine forcibly destroyed the actor the moment a tag was removed, a VFX artist would have no way to play a fade-out, dissolve, or wind-down animation — the effect would simply blink out of existence. By handing the lifetime decision to Blueprint, the system gives full creative control to the artist:
+
+- Fade out over 0.5 seconds → set a dissolve timeline in `OnCueRemoved`, call `Destroy()` at the end
+- Detach and let particles finish naturally → detach from actor, set a lifespan
+- Hard cut → call `Destroy()` immediately
+
+The `ActiveLoopingCues` map entry is always cleaned up by the C++ side regardless of what Blueprint does with the actor.
+
+---
+
+### `ActiveEffects` Not Replicated — Lightweight by Design
+
+`ActiveEffects` lives only on the server. This is a conscious **network optimization** decision.
+
+Epic's GAS replicates its equivalent array using `FFastArraySerializer`, a heavy system that tracks per-element deltas and generates significant boilerplate. UniversalStats takes a different philosophy: **the server is the authority, clients only need the results**.
+
+When the server applies an effect, the consequences — stat value changes and tag grants — propagate to clients automatically through `ReplicatedStats` (RepNotify) and tag delegates. A client rendering a health bar or a poison VFX does not need to know *why* the value changed, only *that* it changed. This keeps bandwidth and CPU overhead minimal, which matters at scale in multiplayer.
+
+---
+
+###  `EqualTo` Trigger Condition — Use with Care
+
+The `EqualTo` condition in `UUniversalStatTriggerPreset` uses `FMath::IsNearlyEqual` internally. This is the correct approach — floating point values in memory are rarely bit-identical to a round number (e.g. `100.0` may be stored as `99.9999998`), so a raw `==` comparison would almost never fire.
+
+However, in practice, RPG stat triggers are almost always threshold-based rather than point-exact. **Prefer `LessThanOrEqual` (e.g. `Health <= 0`) over `EqualTo` for reliability**, especially for values modified through replication or float arithmetic chains.
+
+`EqualTo` is safe to use for integer-equivalent stats that are always set directly via `SetStatValue` with a known exact value.
