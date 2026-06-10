@@ -1,6 +1,7 @@
 # RumbleCore — UniversalStats Plugin Wiki
 
 A lightweight, GAS-free stats & effects system for Unreal Engine. Tag-driven, Blueprint-friendly, and built with multiplayer replication in mind.
+Multiplayer: All write operations are server-authoritative. Clients request effect application via Server RPCs in their Character Blueprint. Stat changes and tag/cue events replicate automatically to all clients.
 
 ---
 
