@@ -7,28 +7,28 @@ A lightweight, GAS-free stats & effects system for Unreal Engine. Tag-driven, Bl
 ## Table of Contents
 
 1. [Installation](#installation)
-2. [Demo Map](#demo-map)
-3. [Architecture Overview](#architecture-overview)
-4. [Core Components](#core-components)
+2. [Quick Start Guide](#quick-start-guide)
+3. [Demo Map](#demo-map)
+4. [Architecture Overview](#architecture-overview)
+5. [Core Components](#core-components)
    - [UniversalStatsComponent](#universalstatscomponent)
    - [UniversalCueComponent](#universalcuecomponent)
-5. [Data Assets](#data-assets)
+6. [Data Assets](#data-assets)
    - [UniversalStatPreset](#universalstatpreset)
    - [UniversalStatClampPreset](#universalstatclamppreset)
    - [UniversalStatTriggerPreset](#universalstattriggerpreset)
    - [UniversalCuePreset](#universalcuepreset)
-6. [Effects System](#effects-system)
+7. [Effects System](#effects-system)
    - [UUniversalStatEffect](#uuniversalstateffect)
    - [Effect Duration Types](#effect-duration-types)
    - [Effect Stacking](#effect-stacking)
    - [Applying & Removing Effects](#applying--removing-effects)
-7. [Visual / Audio Cue System](#visual--audio-cue-system)
+8. [Visual / Audio Cue System](#visual--audio-cue-system)
    - [AUniversalGameplayCue](#auniversalgameplaycue)
    - [Cue Types](#cue-types)
-8. [Delegates & Events](#delegates--events)
-9. [UI Listener](#ui-listener)
-10. [Replication](#replication)
-11. [Quick Start Guide](#quick-start-guide)
+9. [Delegates & Events](#delegates--events)
+10. [UI Listener](#ui-listener)
+11. [Replication](#replication)
 12. [Save & Load](#save--load)
 13. [Design Notes & Known Limitations](#design-notes--known-limitations)
 
@@ -55,6 +55,72 @@ A lightweight, GAS-free stats & effects system for Unreal Engine. Tag-driven, Bl
 6. After launching the editor, go to **Edit → Plugins**, search for **RumbleCore**, and confirm it is enabled.
 
 > **Unreal Engine version:** This plugin targets UE5. UE4 is not supported.
+
+---
+
+## Quick Start Guide
+
+### 1. Add Dependencies
+
+In your `.uproject` or plugin `uplugin`, add `GameplayTags` to the dependency modules. RumbleCore already declares the log category `LogRumbleCore`.
+
+### 2. Set Up Gameplay Tags
+
+Define your stat tags in `Project Settings → Gameplay Tags`:
+
+```
+Stat.Health
+Stat.Health.Max
+Stat.Mana
+Stat.Stamina
+State.Poisoned
+Effect.Debuff.Poison
+Event.Character.Dead
+Cue.Hit
+```
+
+### 3. Create Data Assets
+
+Right-click in Content Browser → Miscellaneous → Data Asset:
+
+- `UUniversalStatPreset` — set initial values
+- `UUniversalStatClampPreset` — set HP clamp (min 0, max = `Stat.Health.Max`)
+- `UUniversalStatTriggerPreset` — fire `Event.Character.Dead` when Health ≤ 0
+
+### 4. Add Components
+
+On your Character Blueprint:
+- Add `UniversalStatsComponent` → assign your data assets in Details
+- Add `UniversalCueComponent` → assign your `CuePreset`
+
+> **Recommended:** Instead of adding `UniversalStatsComponent` directly, create a **Blueprint child class** of it first (`BP_HeroStatsComponent`, for example), then add that child to your character. This lets you override `PreStatChange` and other `BlueprintNativeEvent` functions directly in Blueprint — without touching C++. If you add the base class directly, those override points are still available but require a C++ subclass to use.
+
+### 5. Create an Effect
+
+Create a new Blueprint class inheriting `UUniversalStatEffect`. In Class Defaults set:
+
+```
+DurationType = HasDuration
+Duration     = 5.0
+Period       = 1.0
+Modifiers    = [ (Stat.Health, -10) ]
+AssetTag     = Effect.Debuff.Poison
+GrantedTags  = [ State.Poisoned ]
+GameplayCues = [ Cue.Poison.Looping ]
+```
+
+### 6. Apply the Effect
+
+```cpp
+FUniversalEffectSpec Spec(UBP_PoisonEffect::StaticClass(), 1.f, InstigatorActor);
+StatsComponent->ApplyEffectToSelf(Spec);
+```
+
+Or from Blueprint using the `Make FUniversalEffectSpec` node, then `ApplyEffectToSelf`.
+
+### 7. React to Events
+
+In Blueprint, bind `OnGameplayEvent` on the stats component. Check `EventTag == Event.Character.Dead` → play death animation.
 
 ---
 
@@ -531,72 +597,6 @@ Two replicated properties carry the full state clients need:
 **`ActiveEffects`** is intentionally **not replicated**. Effect application must be triggered server-side. The resulting stat and tag changes propagate to clients automatically through the two arrays above. See [ActiveEffects Not Replicated](#-activeeffects-not-replicated--lightweight-by-design) for the reasoning.
 
 All write functions guard with `HasAuthority()` — they are silent no-ops on clients.
-
----
-
-## Quick Start Guide
-
-### 1. Add Dependencies
-
-In your `.uproject` or plugin `uplugin`, add `GameplayTags` to the dependency modules. RumbleCore already declares the log category `LogRumbleCore`.
-
-### 2. Set Up Gameplay Tags
-
-Define your stat tags in `Project Settings → Gameplay Tags`:
-
-```
-Stat.Health
-Stat.Health.Max
-Stat.Mana
-Stat.Stamina
-State.Poisoned
-Effect.Debuff.Poison
-Event.Character.Dead
-Cue.Hit
-```
-
-### 3. Create Data Assets
-
-Right-click in Content Browser → Miscellaneous → Data Asset:
-
-- `UUniversalStatPreset` — set initial values
-- `UUniversalStatClampPreset` — set HP clamp (min 0, max = `Stat.Health.Max`)
-- `UUniversalStatTriggerPreset` — fire `Event.Character.Dead` when Health ≤ 0
-
-### 4. Add Components
-
-On your Character Blueprint:
-- Add `UniversalStatsComponent` → assign your data assets in Details
-- Add `UniversalCueComponent` → assign your `CuePreset`
-
-> **Recommended:** Instead of adding `UniversalStatsComponent` directly, create a **Blueprint child class** of it first (`BP_HeroStatsComponent`, for example), then add that child to your character. This lets you override `PreStatChange` and other `BlueprintNativeEvent` functions directly in Blueprint — without touching C++. If you add the base class directly, those override points are still available but require a C++ subclass to use.
-
-### 5. Create an Effect
-
-Create a new Blueprint class inheriting `UUniversalStatEffect`. In Class Defaults set:
-
-```
-DurationType = HasDuration
-Duration     = 5.0
-Period       = 1.0
-Modifiers    = [ (Stat.Health, -10) ]
-AssetTag     = Effect.Debuff.Poison
-GrantedTags  = [ State.Poisoned ]
-GameplayCues = [ Cue.Poison.Looping ]
-```
-
-### 6. Apply the Effect
-
-```cpp
-FUniversalEffectSpec Spec(UBP_PoisonEffect::StaticClass(), 1.f, InstigatorActor);
-StatsComponent->ApplyEffectToSelf(Spec);
-```
-
-Or from Blueprint using the `Make FUniversalEffectSpec` node, then `ApplyEffectToSelf`.
-
-### 7. React to Events
-
-In Blueprint, bind `OnGameplayEvent` on the stats component. Check `EventTag == Event.Character.Dead` → play death animation.
 
 ---
 
