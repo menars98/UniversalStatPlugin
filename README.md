@@ -29,7 +29,8 @@ A lightweight, GAS-free stats & effects system for Unreal Engine. Tag-driven, Bl
 9. [UI Listener](#ui-listener)
 10. [Replication](#replication)
 11. [Quick Start Guide](#quick-start-guide)
-12. [Design Notes & Known Limitations](#design-notes--known-limitations)
+12. [Save & Load](#save--load)
+13. [Design Notes & Known Limitations](#design-notes--known-limitations)
 
 ---
 
@@ -57,7 +58,7 @@ A lightweight, GAS-free stats & effects system for Unreal Engine. Tag-driven, Bl
 
 ---
 
-## Demo Map
+## Demo Map 
 
 **A showcase map is included in the plugin content — no setup required to try the system.**
 
@@ -74,7 +75,7 @@ The map features several pre-built scenarios so you can experience all major sys
 | **Poison Swamp** | `HasDuration` effect with periodic damage, `State.Poisoned` tag, looping Cue actor with VFX fade-out |
 | **Spike Trap** | Instant effect, `Event.Character.Dead` trigger, camera shake via `OnCueExecuted` |
 | **Armor & Poison Resistance Shrine** | Stacking buff (`AddStack`), `OnCueUpdated` driving material intensity, max stack cap |
-| **Lethal Laser** (Immortality) | PreStatChange override in Action! Prevents lethal damage from dropping health below 1 when the State.Immortal tag is active.
+| **Lethal Laser** (Immortality) | `PreStatChange` override in action — prevents lethal damage from dropping health below 1 when `State.Immortal` tag is active |
 
 > If you don't see the plugin content in the browser, enable **Show Plugin Content** in the Content Browser filter dropdown.
 
@@ -368,7 +369,7 @@ float CalculateModifierMagnitude_Implementation(
 | `HasDuration` | Modifiers applied immediately (or per period). Effect expires after `Duration` seconds. Tags are removed on expiry. |
 | `Infinite` | Modifiers applied immediately (or per period). Lives until explicitly removed. |
 
-> **Note:** Duration-based effects currently do not roll back flat stat modifiers when they expire (marked as TODO in the source). Roll-back is only performed by `RemoveEffectsWithTag` / `RemoveEffectsByClass`. Plan accordingly for permanent buffs — prefer tracking them as a separate "max" stat or implement roll-back in `PreStatChange`.
+> **Roll-back on expiry:** When a `HasDuration` effect expires, flat stat modifiers are automatically reverted. This applies only to non-periodic effects (`Period <= 0`) — periodic DoT/HoT effects apply small deltas repeatedly and have nothing to roll back.
 
 ---
 
@@ -381,6 +382,10 @@ float CalculateModifierMagnitude_Implementation(
 | `AddStack` | Stack count is incremented (up to `MaxStacks`). Duration is also refreshed. `OnCueUpdated` is broadcast with the new stack count. |
 
 Stacking lookup is done by matching `AssetTag`, so it must be set for stacking to work.
+
+> **`AddStack` modifier behavior:** When a new stack is added, modifiers from `Modifiers` are **not re-applied**. Only the first application writes to the stat. Stack count changes are communicated via `OnCueUpdated` — use this in Blueprint to drive any stack-scaled stat changes manually (e.g. recalculate armor bonus as `StackCount * 20`).
+>
+> **Exception — Periodic effects:** For effects with `Period > 0` (DoT/HoT), each tick applies `Modifier.Magnitude * CurrentStackCount`, so stacked poisons naturally deal more damage per tick without any Blueprint wiring needed.
 
 ---
 
@@ -416,8 +421,22 @@ int32 RemoveEffectsByClass(TSubclassOf<UUniversalStatEffect> EffectClassToRemove
 **Clear All**
 
 ```cpp
-// Removes every active effect and broadcasts all tag removals.
+// Removes every active effect, reverts all flat modifiers, and broadcasts all tag removals.
 void ClearAllEffects();
+```
+
+**Cooldown / Duration Query**
+
+```cpp
+// Returns the highest TimeRemaining across all active effects whose GrantedTags or AssetTag
+// matches the given tag. Returns 0.0 if no matching effect is active (ability is ready).
+// Ideal for driving cooldown UI (icon darken, countdown text).
+float GetTimeRemainingForTag(FGameplayTag Tag) const;
+```
+
+Example — Blueprint cooldown bar:
+```
+GetTimeRemainingForTag(State.Cooldown.Dash) / DashCooldownDuration → fill percentage
 ```
 
 ---
@@ -466,11 +485,13 @@ All delegates are `DYNAMIC_MULTICAST` — bindable from both C++ and Blueprint.
 
 | Delegate | Signature | When |
 |---|---|---|
-| `OnStatChanged` | `(OwningComp, StatTag, OldValue, NewValue)` | After any stat value change (server + clients via RepNotify) |
-| `OnGameplayEvent` | `(OwningComp, EventTag, Payload)` | When a trigger threshold is crossed or an Instant cue fires |
-| `OnTagGranted` | `(OwningComp, Tag)` | When an effect grants a tag or `AddLooseTag` is called |
-| `OnTagRemoved` | `(OwningComp, Tag)` | When an effect expires/is removed or `RemoveLooseTag` is called |
-| `OnTagUpdated` | `(OwningComp, Tag, NewStackCount)` | When a stacking effect's stack count changes |
+| `OnStatChanged` | `(OwningComp, StatTag, OldValue, NewValue)` | After any stat value change — server immediately, clients via `OnRep_Stats` |
+| `OnGameplayEvent` | `(OwningComp, EventTag, Payload)` | When a trigger threshold is crossed or an Instant cue fires (server only) |
+| `OnTagGranted` | `(OwningComp, Tag)` | When a tag is added — server immediately, clients via `OnRep_ActiveTags` diff |
+| `OnTagRemoved` | `(OwningComp, Tag)` | When a tag is removed — server immediately, clients via `OnRep_ActiveTags` diff |
+| `OnTagUpdated` | `(OwningComp, Tag, NewStackCount)` | When a stacking effect's stack count changes (server only) |
+
+> `OnTagGranted` and `OnTagRemoved` fire on **both server and clients**. The client-side broadcast is driven by `OnRep_ActiveTags`, which diffs the old and new `ReplicatedTags` container on every replication update. This is what makes `UniversalCueComponent` work correctly in multiplayer — the VFX component receives tag events on the client without needing `ActiveEffects` to be replicated.
 
 ---
 
@@ -496,11 +517,20 @@ Call `EndTask()` when the widget is destroyed to unbind and allow GC.
 
 ## Replication
 
-- `ReplicatedStats` (`TArray<FUniversalStatEntry>`) is replicated with `DOREPLIFETIME`.
-- On the server, `StatsCache` (a `TMap`) is the live working copy. After every write, `UpdateArrayFromCache` syncs the replicated array.
+Two replicated properties carry the full state clients need:
+
+**`ReplicatedStats`** (`TArray<FUniversalStatEntry>`, RepNotify)
+- The server's live working copy is `StatsCache` (a `TMap` for O(1) access). After every write, `UpdateArrayFromCache` syncs the replicated array.
 - On clients, `OnRep_Stats` fires, updates `StatsCache`, and broadcasts `OnStatChanged` **only for stats whose values actually changed** — avoiding spurious UI updates.
-- All write functions guard with `HasAuthority()`. UI and visual systems react to `OnStatChanged` and tag delegates, which fire on both server and clients.
-- `ActiveEffects` is **not replicated** — effect application must be triggered server-side. The resulting stat changes and tag events propagate to clients automatically.
+
+**`ReplicatedTags`** (`FGameplayTagContainer`, RepNotify)
+- A flat snapshot of all active tags: `BaseTags` + every `GrantedTag` + every `GameplayCue` tag from all active effects.
+- Rebuilt on the server (`UpdateReplicatedTags`) whenever any effect is applied, removed, or cleared, and when loose tags change.
+- On clients, `OnRep_ActiveTags` **diffs** the old and new containers: tags that appeared trigger `OnTagGranted`, tags that disappeared trigger `OnTagRemoved`. This is what drives `UniversalCueComponent` in multiplayer — poison bubbles appear on all clients without `ActiveEffects` ever being replicated.
+
+**`ActiveEffects`** is intentionally **not replicated**. Effect application must be triggered server-side. The resulting stat and tag changes propagate to clients automatically through the two arrays above. See [ActiveEffects Not Replicated](#-activeeffects-not-replicated--lightweight-by-design) for the reasoning.
+
+All write functions guard with `HasAuthority()` — they are silent no-ops on clients.
 
 ---
 
@@ -570,6 +600,33 @@ In Blueprint, bind `OnGameplayEvent` on the stats component. Check `EventTag == 
 
 ---
 
+## Save & Load
+
+`UniversalStatsComponent` provides two functions for persisting stat values to an Unreal `SaveGame` object.
+
+```cpp
+// Extracts the current stat snapshot as a TMap. Write this into your SaveGame object.
+TMap<FGameplayTag, float> GetStatsForSave() const;
+
+// Injects a previously saved TMap back into the component.
+// Rebuilds ReplicatedStats and broadcasts OnStatChanged for every stat so UI snaps to the correct values.
+void RestoreStatsFromSave(const TMap<FGameplayTag, float>& SavedStats);
+```
+
+**Typical pattern:**
+
+```cpp
+// On Save:
+MySaveGame->Stats = StatsComponent->GetStatsForSave();
+
+// On Load (BeginPlay or after save game is loaded):
+StatsComponent->RestoreStatsFromSave(MySaveGame->Stats);
+```
+
+> **Important:** Active effects (running poisons, temporary speed buffs, cooldown states) are **not persisted** — only the hard numerical stat values are saved and restored. Any effect with a remaining duration will be naturally lost on reload. This is an intentional v1 design decision to keep the framework lightweight and avoid complex instigator pointer serialization. If an effect had already modified a stat before saving (e.g. a permanent curse lowered MaxHP), that result is captured in the saved value automatically.
+
+---
+
 ## Design Notes & Known Limitations
 
 ### Cue Actor Lifetime — Full VFX Control by Design
@@ -592,11 +649,15 @@ The `ActiveLoopingCues` map entry is always cleaned up by the C++ side regardles
 
 Epic's GAS replicates its equivalent array using `FFastArraySerializer`, a heavy system that tracks per-element deltas and generates significant boilerplate. UniversalStats takes a different philosophy: **the server is the authority, clients only need the results**.
 
-When the server applies an effect, the consequences — stat value changes and tag grants — propagate to clients automatically through `ReplicatedStats` (RepNotify) and tag delegates. A client rendering a health bar or a poison VFX does not need to know *why* the value changed, only *that* it changed. This keeps bandwidth and CPU overhead minimal, which matters at scale in multiplayer.
+When the server applies an effect, two things happen automatically:
+- Stat value changes flow to clients through `ReplicatedStats` → `OnRep_Stats` → `OnStatChanged`
+- Tag state flows to clients through `ReplicatedTags` → `OnRep_ActiveTags` → `OnTagGranted` / `OnTagRemoved`
+
+A client rendering a health bar or a poison VFX does not need to know *why* the value changed, only *that* it changed. This keeps bandwidth and CPU overhead minimal — no per-element delta tracking, no serialization of instigator pointers or effect class references across the wire.
 
 ---
 
-###  `EqualTo` Trigger Condition — Use with Care
+### `EqualTo` Trigger Condition — Use with Care
 
 The `EqualTo` condition in `UUniversalStatTriggerPreset` uses `FMath::IsNearlyEqual` internally. This is the correct approach — floating point values in memory are rarely bit-identical to a round number (e.g. `100.0` may be stored as `99.9999998`), so a raw `==` comparison would almost never fire.
 
