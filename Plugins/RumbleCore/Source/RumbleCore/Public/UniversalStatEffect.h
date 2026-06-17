@@ -4,8 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "Templates/SubclassOf.h"
 #include "GameplayTagContainer.h"
 #include "UniversalStatEffect.generated.h"
+
+class UUniversalStatsComponent;
 
 // Effect type
 UENUM(BlueprintType)
@@ -93,7 +96,7 @@ public:
 	// --- FUNCTIONS ---
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Effect Execution")
-	float CalculateModifierMagnitude(class UUniversalStatsComponent* TargetComponent, AActor* Instigator, float EffectLevel, FGameplayTag StatTag, float BaseMagnitude) const;
+	float CalculateModifierMagnitude(UUniversalStatsComponent* TargetComponent, AActor* Instigator, float EffectLevel, FGameplayTag StatTag, float BaseMagnitude) const;
 };
 
 USTRUCT(BlueprintType)

@@ -69,7 +69,7 @@ void UUniversalCueComponent::HandleGameplayEvent(UUniversalStatsComponent* Ownin
 // Start looping/duration effects
 void UUniversalCueComponent::HandleTagGranted(UUniversalStatsComponent* OwningComp, FGameplayTag Tag)
 {
-	// If we are already playing a cue for this tag, don't add a second one!
+	// If we are already playing a cue for this tag, dont add a second one!
 	if (!CuePreset || ActiveLoopingCues.Contains(Tag)) return;
 
 	for (const FLoopingCueInfo& CueInfo : CuePreset->LoopingCues)
@@ -106,7 +106,7 @@ void UUniversalCueComponent::HandleTagRemoved(UUniversalStatsComponent* OwningCo
 	{
 		if (AUniversalGameplayCue* ValidCue = *FoundCue)
 		{
-			// Give Blueprint a chance to Restore the material to its original state” before deleting it.
+			// Give Blueprint a chance to Restore the material to its original state before deleting it.
 			ValidCue->OnCueRemoved(GetOwner());
 
 			// Completely erase the actor from the world
