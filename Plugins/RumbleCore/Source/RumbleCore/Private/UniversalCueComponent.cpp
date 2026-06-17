@@ -1,5 +1,9 @@
+// Copyright (c) 2026 [Menars]. All Rights Reserved.
+
 #include "UniversalCueComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"       
+#include "GameFramework/Actor.h"
 #include "NiagaraFunctionLibrary.h"
 
 UUniversalCueComponent::UUniversalCueComponent()
@@ -34,7 +38,7 @@ void UUniversalCueComponent::HandleGameplayEvent(UUniversalStatsComponent* Ownin
 			// Ligth Mode: If you just want to spawn a sound effect and particle effect without creating a Cue Actor, you can do it like this:
 			if (CueInfo.ParticleEffect)
 			{
-				UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), CueInfo.ParticleEffect, GetOwner()->GetActorLocation());
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, CueInfo.ParticleEffect, GetOwner()->GetActorLocation());
 			}
 
 			// Ligth Mode: If you just want to spawn a sound effect and particle effect without creating a Cue Actor, you can do it like this:
@@ -102,7 +106,7 @@ void UUniversalCueComponent::HandleTagRemoved(UUniversalStatsComponent* OwningCo
 	{
 		if (AUniversalGameplayCue* ValidCue = *FoundCue)
 		{
-			// Give Blueprint a chance to “Restore the material to its original state” before deleting it.
+			// Give Blueprint a chance to Restore the material to its original state” before deleting it.
 			ValidCue->OnCueRemoved(GetOwner());
 
 			// Completely erase the actor from the world
@@ -120,7 +124,7 @@ void UUniversalCueComponent::HandleTagUpdated(UUniversalStatsComponent* OwningCo
 	{
 		if (AUniversalGameplayCue* ValidCue = *FoundCue)
 		{
-			// Broadcast to Cue Actor to update the effect based on the new stack count (e.g., Update the intensity of the material based on the stack count)
+			// Broadcast to Cue Actor to update the effect based on the new stack count (Update the intensity of the material based on the stack count)
 			ValidCue->OnCueUpdated(GetOwner(), NewStackCount);
 		}
 	}

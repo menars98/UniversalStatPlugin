@@ -11,9 +11,6 @@
   "MarketplaceURL": "",
   "SupportURL": "https://github.com/menars98/UniversalStatPlugin/issues",
   "EngineVersion": "5.4.0", 
-  "SupportedTargetPlatforms": [
-    "Win64"
-  ],
   "CanContainContent": false,
   "IsBetaVersion": false,
   "IsExperimentalVersion": false,
@@ -22,7 +19,18 @@
     {
       "Name": "RumbleCore",
       "Type": "Runtime",
-      "LoadingPhase": "Default"
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64",
+        "Mac",
+        "Linux"
+      ]
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "Niagara",
+      "Enabled": true
     }
   ]
 }

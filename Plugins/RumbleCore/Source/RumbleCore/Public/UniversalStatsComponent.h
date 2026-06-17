@@ -17,18 +17,18 @@ struct FActiveStatEffect
 	GENERATED_BODY()
 
 	// Unique handle for this active effect instance. We will use this to identify and remove specific effects when needed (e.g. dispels, cleanses).
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Universal Stat")
 	FGuid EffectHandle;
 
 	// Level, instigator & class
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Universal Stat")
 	FUniversalEffectSpec Spec;
 
-	// Not the object itself, just a read-only pointer to its “Default Copy (CDO)”!
+	// Not the object itself, just a read-only pointer to its Default Copy (CDO)!
 	UPROPERTY()
 	const UUniversalStatEffect* EffectDef = nullptr;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Universal Stat")
 	int32 CurrentStackCount = 1;
 
 	float TimeRemaining = 0.f;
@@ -60,10 +60,10 @@ struct FUniversalStatEntry
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Universal Stat")
 	FGameplayTag StatTag;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Universal Stat")	
 	float Value = 0.f;
 
 	FUniversalStatEntry() {}
@@ -159,7 +159,7 @@ public:
 	void AdjustStatForMaxChange(FGameplayTag AffectedStatTag, FGameplayTag MaxStatTag, float NewMaxValue, EStatAdjustmentType AdjustmentType);
 
 	// STEP 1 (MANAGEMENT): To delete a specific Effect (or tag group) above us
-	// Example: When drinking the antidote, we will send and delete the “Effect.Debuff.Poison” tag. It returns how many were deleted.
+	// Example: When drinking the antidote, we will send and delete the Effect.Debuff.Poison tag. It returns how many were deleted.
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Universal Stats|Effects")
 	int32 RemoveEffectsWithTag(FGameplayTag TagToRemove, int32 StacksToRemove = -1);
 

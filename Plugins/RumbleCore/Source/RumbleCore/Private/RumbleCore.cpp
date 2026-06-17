@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2026 [Menars]. All Rights Reserved.
 
 #include "RumbleCore.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"

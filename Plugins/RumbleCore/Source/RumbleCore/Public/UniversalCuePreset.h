@@ -14,19 +14,19 @@ struct FInstantCueInfo
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Cue")
 	FGameplayTag TriggerTag;
 
 	// 1. We will use this class to spawn a Cue Actor when the tag is added, and destroy it when the tag is removed. 
 	// (e.g., Make the material green when the "Poison" tag is added, and restore the material to its original state when the "Poison" tag is removed)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Cue")
 	TSubclassOf<AUniversalGameplayCue> CueClass;
 
 	// 2. We will spawn the particle effect and sound effect when the tag is added, and destroy them when the tag is removed.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Cue")
 	class UNiagaraSystem* ParticleEffect = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Cue")
 	class USoundBase* SoundEffect = nullptr;
 };
 // 2. For Looping Effects
@@ -35,10 +35,10 @@ struct FLoopingCueInfo
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Cue")
 	FGameplayTag TriggerTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Cue")
 	TSubclassOf<AUniversalGameplayCue> CueClass;
 };
 

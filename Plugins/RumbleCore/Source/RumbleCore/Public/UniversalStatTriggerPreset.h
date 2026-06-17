@@ -13,10 +13,10 @@ struct FStatEventPayload
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Universal Stat")
 	FGameplayTag TriggeringStat; 
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Universal Stat")
 	float TriggeringValue; 
 
 	// "AActor* Instigator" 

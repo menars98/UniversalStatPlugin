@@ -12,10 +12,10 @@ struct FStatValuePair
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Stat")
     FGameplayTag StatTag;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Stat")
     float Value;
 };
 
@@ -26,9 +26,9 @@ class RUMBLECORE_API UUniversalStatPreset : public UDataAsset
 	GENERATED_BODY()
 	
 public:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Stat")
     TArray<FStatValuePair> InitialStats;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Info")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Universal Stat")
     FText PresetName;
 };

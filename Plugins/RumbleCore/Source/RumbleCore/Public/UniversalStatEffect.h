@@ -24,36 +24,16 @@ enum class EEffectStackingType : uint8
 	AddStack			// It stacks
 };
 
-USTRUCT(BlueprintType)
-struct FUniversalEffectSpec
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spec")
-	TSubclassOf<class UUniversalStatEffect> EffectClass;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spec")
-	float Level = 1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spec")
-	AActor* Instigator = nullptr;
-
-	FUniversalEffectSpec() {}
-	FUniversalEffectSpec(TSubclassOf<class UUniversalStatEffect> InClass, float InLevel = 1.f, AActor* InInstigator = nullptr)
-		: EffectClass(InClass), Level(InLevel), Instigator(InInstigator) {
-	}
-};
-
 // Struct to hold information about a stat modifier, used in UUniversalStatEffect
 USTRUCT(BlueprintType)
 struct FStatModifierInfo
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Modifier")
 	FGameplayTag StatTag; // Which Stat
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Modifier")
 	float Magnitude = 0.f; // How much it modifies the stat (can be positive or negative)
 };
 
@@ -114,4 +94,24 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Effect Execution")
 	float CalculateModifierMagnitude(class UUniversalStatsComponent* TargetComponent, AActor* Instigator, float EffectLevel, FGameplayTag StatTag, float BaseMagnitude) const;
+};
+
+USTRUCT(BlueprintType)
+struct FUniversalEffectSpec
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spec")
+	TSubclassOf<UUniversalStatEffect> EffectClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spec")
+	float Level = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spec")
+	AActor* Instigator = nullptr;
+
+	FUniversalEffectSpec() {}
+	FUniversalEffectSpec(TSubclassOf<UUniversalStatEffect> InClass, float InLevel = 1.f, AActor* InInstigator = nullptr)
+		: EffectClass(InClass), Level(InLevel), Instigator(InInstigator) {
+	}
 };

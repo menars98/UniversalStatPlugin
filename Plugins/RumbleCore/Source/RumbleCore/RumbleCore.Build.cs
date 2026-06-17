@@ -1,4 +1,5 @@
-// Some copyright should be here...
+// Copyright (c) 2026 Menars. All Rights Reserved.
+// Universal Stat & Effect Framework
 
 using UnrealBuildTool;
 
@@ -8,30 +9,14 @@ public class RumbleCore : ModuleRules
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
-		PublicIncludePaths.AddRange(
-			new string[] {
-				// ... add public include paths required here ...
-			}
-			);
-				
-		
-		PrivateIncludePaths.AddRange(
-			new string[] {
-				// ... add other private include paths required here ...
-			}
-			);
-			
-		
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"Core",
-                "GameplayTags",
-				// ... add other public dependencies that you statically link with here ...
+				"GameplayTags"
 			}
-			);
+		);
 			
-		
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
@@ -39,21 +24,8 @@ public class RumbleCore : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-                "UnrealEd",
-				"EditorScriptingUtilities",
-				"AssetTools",
-				"ContentBrowser",
-                "Niagara",
-				// ... add private dependencies that you statically link with here ...	
+				"Niagara"
 			}
-			);
-		
-		
-		DynamicallyLoadedModuleNames.AddRange(
-			new string[]
-			{
-				// ... add any modules that your module loads dynamically here ...
-			}
-			);
+		);
 	}
 }
