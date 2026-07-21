@@ -32,7 +32,7 @@ Multiplayer: All write operations are server-authoritative. Clients request effe
 11. [Replication](#replication)
 12. [Save & Load](#save--load)
 13. [Design Notes & Known Limitations](#design-notes--known-limitations)
-
+14. [Tutorials & Guides](#tutorials--guides)
 ---
 
 ## Installation
@@ -664,4 +664,79 @@ The `EqualTo` condition in `UUniversalStatTriggerPreset` uses `FMath::IsNearlyEq
 
 However, in practice, RPG stat triggers are almost always threshold-based rather than point-exact. **Prefer `LessThanOrEqual` (e.g. `Health <= 0`) over `EqualTo` for reliability**, especially for values modified through replication or float arithmetic chains.
 
+## Tutorials & Guides
+
+### Shield & Damage Mitigation System (Armor)
+
+In many RPGs, characters have secondary defense layers like **Shields** (temporary flat absorption pools) and **Armor** (percentage-based damage reduction). 
+
+Depending on your game design, you may want these two stats to interact in different ways. This tutorial covers how to implement both paradigms using the Universal Stats Plugin.
+
 `EqualTo` is safe to use for integer-equivalent stats that are always set directly via `SetStatValue` with a known exact value.
+
+#### Design Paradigms
+
+*   **Paradigm A: Armor Protects Shield (Armor $\rightarrow$ Shield $\rightarrow$ Health)**  
+    Incoming raw damage is first reduced by Armor. The remaining reduced damage is then applied to the Shield. If the Shield is depleted, any leftover damage goes to Health. *(Commonly used in sci-fi games where physical armor shields the energy barrier).*
+    
+*   **Paradigm B: Shield as an Outer Energy Barrier (Shield $\rightarrow$ Armor $\rightarrow$ Health)**  
+    Incoming raw damage hits the outer Shield directly at 100% value. Once the Shield is completely depleted, any leaking/remaining damage is then reduced by Armor before hitting physical Health. *(Commonly used in fantasy games where magical wards sit outside the armor).*
+
+---
+
+#### 1. Implementing Paradigm A (Armor $\rightarrow$ Shield $\rightarrow$ Health)
+
+The most modular way to implement this is by reducing damage on the **Stat Effect** side using `CalculateModifierMagnitude` and handling the shield absorption on the **Component** side inside `PreStatChange`.
+
+##### Step 1: Setting up the Armor Buff and Physical Damage Effects
+1.  Create your Armor stat (e.g., `Stats.Resistance.Armor`) and your Shield stat (e.g., `Stats.Base.Shield`).
+2.  In your Physical Damage Effect (an `Instant` effect modifying `Stats.Base.Health`), override the **`CalculateModifierMagnitude`** function:
+    *   Get the target's `Stats.Resistance.Armor` value using `GetStatValue`.
+    *   Calculate the reduction multiplier: `DamageReduction = Armor / 100.0` (or use your custom math).
+    *   Reduce your Base Magnitude (damage) using: `ReducedDamage = BaseMagnitude * (1.0 - DamageReduction)`.
+    *   Pass this through a `Min(0.0, ReducedDamage)` node to prevent high armor values from turning damage into healing.
+    *   Return this value.
+
+##### Step 2: Component-Side Shield Absorption (PreStatChange Override)
+To apply the remaining damage to your Shield before it depletes Health, create a child blueprint of `UniversalStatsComponent` (e.g., `BP_StatsComponent`) and override the **`PreStatChange`** function.
+
+> ⚠️ **CRITICAL BLUEPRINT TIP (Race Condition Prevention):**  
+> Pure nodes (like `GetStatValue`, `Min`, `Subtract` without execution pins) evaluate *on-demand*. Since calling `SetStatValue` mutates the Shield value, evaluating these nodes *after* setting the Shield will cause double-evaluation bugs. Always cache your variables into **Local Variables** at the start of your branch.
+
+**Blueprint Flow:**
+1.  Check if `StatTag` matches `Stats.Base.Health` using `Equal (Gameplay Tag)`.
+2.  If **True**, immediately save your values into Local Variables to cache the state:
+    *   `Local_CurrentHealth` = `GetStatValue (Stats.Base.Health)`
+    *   `Local_DamageAmount` = `Local_CurrentHealth - AttemptedValue`
+3.  Check if `Local_DamageAmount >= 0` (to ensure it's damage, not healing).
+4.  If **True**, check if `GetStatValue (Stats.Base.Shield) > 0`.
+5.  If the Shield is active:
+    *   Calculate and save: `Local_AbsorbedDamage = Min(GetStatValue(Stats.Base.Shield), Local_DamageAmount)`.
+    *   Update your Shield value: Call `SetStatValue (Stats.Base.Shield, CurrentShield - Local_AbsorbedDamage)`.
+    *   Calculate the final health to return using your cached local variables:  
+        `FinalHealth = Local_CurrentHealth - (Local_DamageAmount - Local_AbsorbedDamage)`.
+    *   Return `FinalHealth`.
+6.  If any check fails (no shield, healing, etc.), simply return `AttemptedValue` directly.
+
+---
+
+#### 2. Implementing Paradigm B (Shield $\rightarrow$ Armor $\rightarrow$ Health)
+
+If you want the Shield to absorb raw damage *first*, and apply Armor mitigation *only* to the remaining damage that bypasses the Shield, you should pass the raw damage directly from the effect and handle both calculations inside `PreStatChange`.
+
+##### Component-Side Shield & Armor Logic (PreStatChange Override)
+1.  Check if `StatTag` matches `Stats.Base.Health`.
+2.  If **True**, save your values to Local Variables:
+    *   `Local_CurrentHealth` = `GetStatValue (Stats.Base.Health)`
+    *   `Local_RawDamageAmount` = `Local_CurrentHealth - AttemptedValue`
+3.  If `Local_RawDamageAmount >= 0` and `GetStatValue(Stats.Base.Shield) > 0`:
+    *   Calculate and save: `Local_AbsorbedDamage = Min(GetStatValue(Stats.Base.Shield), Local_RawDamageAmount)`.
+    *   Update your Shield value: `SetStatValue(Stats.Base.Shield, CurrentShield - Local_AbsorbedDamage)`.
+    *   Calculate remaining raw damage that bypassed the shield:  
+        `RemainingRawDamage = Local_RawDamageAmount - Local_AbsorbedDamage`.
+    *   Read `Stats.Resistance.Armor` and apply mitigation only to the bypassed damage:  
+        `MitigatedRemainingDamage = RemainingRawDamage * (1.0 - (Armor / 100.0))`.
+    *   Calculate the final health to return:  
+        `FinalHealth = Local_CurrentHealth - MitigatedRemainingDamage`.
+    *   Return `FinalHealth`.
+4.  If any check fails, return `AttemptedValue` directly.
