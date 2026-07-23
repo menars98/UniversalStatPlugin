@@ -252,7 +252,8 @@ protected:
 	UFUNCTION(BlueprintPure, Category = "Universal Stats|Tags")
 	FGameplayTagContainer GetAllActiveTags() const;
 
-	// 2. Chance
+	// 2. Chanc
+	UFUNCTION(BlueprintPure, Category = "Universal Stats")
 	bool CanApplyEffect(const UUniversalStatEffect* EffectDef) const;
 
 	// 3. Stacking 
