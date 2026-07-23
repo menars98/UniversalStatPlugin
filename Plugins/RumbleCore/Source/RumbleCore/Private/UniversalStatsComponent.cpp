@@ -372,7 +372,15 @@ FGuid UUniversalStatsComponent::ApplyEffectToSelf(const FUniversalEffectSpec& Ef
 
 	if (!CanApplyEffect(EffectDef)) return FGuid();
 
+	// Chance Control
+	if (EffectDef->ApplicationChance < 1.0f && FMath::FRand() > EffectDef->ApplicationChance)
+	{
+		return FGuid();
+	}
+
 	// Instant effects
+	// To fix guid duplication, we will not create a new active effect for instant effects. Instead, we will just execute the modifiers and return a new guid.
+	// This is because instant effects do not have a duration or stacking, so there is no need to keep track of them in the ActiveEffects array.
 	if (EffectDef->DurationType == EEffectDurationType::Instant)
 	{
 		ExecuteEffectModifiers(EffectSpec, EffectDef);
@@ -383,7 +391,7 @@ FGuid UUniversalStatsComponent::ApplyEffectToSelf(const FUniversalEffectSpec& Ef
 			OnGameplayEvent.Broadcast(this, CueTag, DummyPayload);
 		}
 
-		return FGuid(); 
+		return FGuid::NewGuid();
 	}
 
 	// Stacking 
@@ -781,12 +789,7 @@ FGameplayTagContainer UUniversalStatsComponent::GetAllActiveTags() const
 bool UUniversalStatsComponent::CanApplyEffect(const UUniversalStatEffect* EffectDef) const
 {
 	if (!EffectDef) return false;
-
-	// Chance Control
-	if (EffectDef->ApplicationChance < 1.0f && FMath::FRand() > EffectDef->ApplicationChance)
-	{
-		return false;
-	}
+	//V1.1 Removed Chance func and moved to ApplyEffectToSelf to fix double roll issue. Now we just check if the target meets the tag requirements for the effect.
 
 	// Tag Control
 	FGameplayTagContainer TargetTags = GetAllActiveTags();
